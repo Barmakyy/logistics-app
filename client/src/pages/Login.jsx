@@ -1,12 +1,13 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
   const { login } = useContext(AuthContext);
+  const { showNotification } = useNotification();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -15,11 +16,11 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     try {
-      const response = await axios.post('/api/auth/login', formData);
+      const response = await api.post('/auth/login', formData);
       const { token, data } = response.data;
       login(data.user, token);
+      showNotification('Login successful!', 'success');
 
       // Redirect based on role
       if (data.user.role === 'admin') {
@@ -28,7 +29,7 @@ const Login = () => {
         navigate('/customer/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      showNotification(err.response?.data?.message || 'Login failed. Please try again.', 'error');
     }
   };
 
@@ -36,7 +37,6 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <h2 className="text-2xl font-bold text-center text-primary mb-6">Login</h2>
-        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700">Email</label>

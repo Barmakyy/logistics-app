@@ -5,6 +5,11 @@ import dotenv from 'dotenv';
 import authRouter from './routes/authRoutes.js';
 import dashboardRouter from './routes/dashboardRoutes.js';
 import shipmentRouter from './routes/shipmentRoutes.js';
+import customerRouter from './routes/customerRoutes.js';
+import paymentRouter from './routes/paymentRoutes.js';
+import agentRouter from './routes/agentRoutes.js';
+import messageRouter from './routes/messageRoutes.js';
+import settingRouter from './routes/settingRoutes.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -19,6 +24,11 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/shipments', shipmentRouter);
+app.use('/api/customers', customerRouter);
+app.use('/api/agents', agentRouter);
+app.use('/api/payments', paymentRouter);
+app.use('/api/messages', messageRouter);
+app.use('/api/settings', settingRouter);
 
 // A simple test route
 app.get('/api/test', (req, res) => {

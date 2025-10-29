@@ -11,9 +11,16 @@ import Register from './pages/Register.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import DashboardOverview from './pages/DashboardOverview.jsx';
 import Shipments from './pages/Shipments.jsx';
+import Customers from './pages/Customers.jsx';
+import Agents from './pages/Agents.jsx';
+import Payments from './pages/Payments.jsx';
+import Settings from './pages/Settings.jsx';
+import Messages from './pages/Messages.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { NotificationProvider } from './context/NotificationContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 const router = createBrowserRouter([
   {
@@ -32,6 +39,11 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardOverview /> },
           { path: 'shipments', element: <Shipments /> },
+          { path: 'customers', element: <Customers /> },
+          { path: 'agents', element: <Agents /> },
+          { path: 'payments', element: <Payments /> },
+          { path: 'settings', element: <Settings /> },
+          { path: 'messages', element: <Messages /> },
         ],
       },
       { path: 'customer/dashboard', element: <CustomerDashboard /> },
@@ -41,8 +53,12 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider>
+      <NotificationProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </NotificationProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );

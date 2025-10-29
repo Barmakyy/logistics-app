@@ -13,9 +13,12 @@ import {
   FaSearch,
   FaBell,
   FaUserCircle,
+  FaSun,
+  FaMoon,
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const sidebarVariants = {
   open: {
@@ -115,41 +118,52 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   );
 };
 
-const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen }) => (
-  <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-    {/* Hamburger Menu for mobile */}
-    <button
-      onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-      className="text-gray-500 focus:outline-none lg:hidden"
-    >
-      {isSidebarOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
-    </button>
+const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
+  const { theme, toggleTheme } = useTheme();
 
-    {/* Search Bar */}
-    <div className="relative hidden md:block">
-      <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
-      <input
-        type="text"
-        placeholder="Search shipments, customers..."
-        className="bg-gray-100 focus:bg-white focus:ring-2 focus:ring-primary border border-gray-200 rounded-full py-2 pl-10 pr-4 w-80 transition-all"
-      />
-    </div>
-
-    {/* Right-side icons and profile */}
-    <div className="flex items-center space-x-6">
-      <button className="text-gray-500 hover:text-primary">
-        <FaBell size={22} />
+  return (
+    <header className="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center">
+      {/* Hamburger Menu for mobile */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="text-gray-500 dark:text-gray-400 focus:outline-none lg:hidden"
+      >
+        {isSidebarOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
       </button>
-      <div className="relative">
-        <button className="flex items-center space-x-2">
-          <FaUserCircle size={28} className="text-gray-600" />
-          <span className="hidden md:inline font-medium text-gray-700">Admin</span>
-        </button>
-        {/* Dropdown would go here */}
+
+      {/* Search Bar */}
+      <div className="relative hidden md:block">
+        <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search shipments, customers..."
+          className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-primary border border-gray-200 dark:border-gray-600 rounded-full py-2 pl-10 pr-4 w-80 transition-all"
+        />
       </div>
-    </div>
-  </header>
-);
+
+      {/* Right-side icons and profile */}
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={toggleTheme}
+          className="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-accent focus:outline-none"
+          aria-label="Toggle dark mode"
+        >
+          {theme === 'light' ? <FaMoon size={20} /> : <FaSun size={22} />}
+        </button>
+        <button className="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-accent">
+          <FaBell size={22} />
+        </button>
+        <div className="relative">
+          <button className="flex items-center space-x-2">
+            <FaUserCircle size={28} className="text-gray-600 dark:text-gray-300" />
+            <span className="hidden md:inline font-medium text-gray-700 dark:text-gray-200">Admin</span>
+          </button>
+          {/* Dropdown would go here */}
+        </div>
+      </div>
+    </header>
+  );
+};
 
 const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);

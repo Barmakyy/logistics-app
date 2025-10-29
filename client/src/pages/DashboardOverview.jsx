@@ -130,7 +130,7 @@ const DashboardOverview = () => {
           <ul className="space-y-4">
             {(stats?.recentActivities || []).map(activity => (
               <li key={activity.id} className="flex items-start">
-                <div className={`bg-accent/20 text-accent rounded-full h-8 w-8 flex-shrink-0 flex items-center justify-center`}>
+                <div className={`bg-accent/20 text-accent rounded-full h-8 w-8 shrink-0 flex items-center justify-center`}>
                   {activity.type === 'shipment' ? (
                     <FaShippingFast size={16} />
                   ) : (

@@ -14,6 +14,10 @@ const shipmentSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    agent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     origin: {
       type: String,
       required: [true, 'Origin is required'],

@@ -1,7 +1,29 @@
+import React, { useState } from 'react';
 import { motion } from "framer-motion";
-import { FaMapMarkerAlt, FaEnvelope, FaPhone } from "react-icons/fa";
+import { FaMapMarkerAlt, FaEnvelope, FaPhone, FaWhatsapp } from "react-icons/fa";
+import api from '../api/axios';
+import { useNotification } from '../context/NotificationContext';
 
 const Contact = () => {
+  const [formData, setFormData] = useState({ sender: '', email: '', subject: '', body: '' });
+  const { showNotification } = useNotification();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/messages', formData);
+      showNotification('Message sent successfully! We will get back to you soon.', 'success');
+      setFormData({ sender: '', email: '', subject: '', body: '' }); // Reset form
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to send message. Please try again.';
+      showNotification(message, 'error');
+    }
+  };
+
   return (
     <div
       className="relative min-h-screen bg-cover bg-center flex items-center justify-center"
@@ -49,7 +71,7 @@ const Contact = () => {
           </div>
 
           {/* Form */}
-          <form className="p-8 md:p-10 space-y-5 bg-white text-left">
+          <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-5 bg-white text-left">
             <h2 className="text-3xl font-bold mb-6 text-primary">Send us a Message</h2>
             <div>
               <label className="block mb-2 font-semibold text-gray-700">
@@ -57,8 +79,12 @@ const Contact = () => {
               </label>
               <input
                 type="text"
+                name="sender"
                 placeholder="Enter your name"
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-400 outline-none"
+                value={formData.sender}
+                onChange={handleChange}
+                required
               />
             </div>
             <div>
@@ -67,8 +93,12 @@ const Contact = () => {
               </label>
               <input
                 type="email"
+                name="email"
                 placeholder="Enter your email"
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-400 outline-none"
+                value={formData.email}
+                onChange={handleChange}
+                required
               />
             </div>
             <div>
@@ -77,8 +107,12 @@ const Contact = () => {
               </label>
               <input
                 type="text"
+                name="subject"
                 placeholder="e.g., Shipping Quote"
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-400 outline-none"
+                value={formData.subject}
+                onChange={handleChange}
+                required
               />
             </div>
             <div>
@@ -86,9 +120,13 @@ const Contact = () => {
                 Message
               </label>
               <textarea
+                name="body"
                 rows="4"
                 placeholder="Write your message..."
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-yellow-400 outline-none"
+                value={formData.body}
+                onChange={handleChange}
+                required
               ></textarea>
             </div>
             <button
@@ -99,6 +137,20 @@ const Contact = () => {
             </button>
           </form>
         </div>
+
+        {/* WhatsApp CTA */}
+        <div className="mt-12 text-center">
+          <a
+            href="https://wa.me/254759692110?text=Hello%20BongoExpress%2C%20I%E2%80%99d%20like%20to%20inquire%20about%20your%20logistics%20services."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-3 bg-[#25D366] text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-[#128C7E] transition-colors duration-300"
+          >
+            <FaWhatsapp size={24} />
+            <span>Message Us on WhatsApp</span>
+          </a>
+        </div>
+
 
         {/* 🗺️ Google Map Section */}
         <motion.div

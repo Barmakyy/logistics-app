@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaPlus, FaSearch, FaTruck, FaCheckCircle, FaExclamationTriangle, FaTimesCircle, FaBoxOpen } from 'react-icons/fa';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import axios from 'axios';
 import { format } from 'date-fns';
+import api from '../api/axios';
+import { useNotification } from '../context/NotificationContext';
 
 const statusStyles = {
   Delivered: 'bg-green-100 text-green-700',
@@ -32,9 +33,10 @@ const StatusBadge = ({ status }) => (
 const Shipments = () => {
   const [shipments, setShipments] = useState([]);
   const [summary, setSummary] = useState({});
+  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
-  const [error, setError] = useState('');
+  const { showNotification } = useNotification();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const initialFormState = {
     customerName: '',
@@ -43,12 +45,15 @@ const Shipments = () => {
     weight: '',
     packageDetails: '',
     status: 'Pending',
+    agent: '',
   };
   const [currentShipment, setCurrentShipment] = useState(initialFormState);
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 10;
   const [editingShipment, setEditingShipment] = useState(null);
 
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState(null);
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.9 },
     visible: { opacity: 1, scale: 1 },
@@ -57,16 +62,17 @@ const Shipments = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [shipmentsRes, summaryRes] = await Promise.all([
-        axios.get(`/api/shipments?page=${currentPage}&limit=${limit}`),
-        axios.get('/api/shipments/summary'),
+      const [shipmentsRes, summaryRes, agentsRes] = await Promise.all([
+        api.get(`/shipments?page=${currentPage}&limit=${limit}`),
+        api.get('/shipments/summary'),
+        api.get('/agents/list'),
       ]);
       setShipments(shipmentsRes.data.data.shipments);
       setPagination(shipmentsRes.data.data.pagination);
       setSummary(summaryRes.data.data);
-      setError('');
+      setAgents(agentsRes.data.data.agents);
     } catch (err) {
-      setError('Failed to fetch shipment data.');
+      showNotification('Failed to fetch shipment data.', 'error');
       console.error(err);
     } finally {
       setLoading(false);
@@ -79,19 +85,27 @@ const Shipments = () => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (editingShipment) {
-      // Update existing shipment
-      await axios.put(`/api/shipments/${editingShipment._id}`, currentShipment);
-    } else {
-      // Create new shipment
-      await axios.post('/api/shipments', currentShipment);
-    }
-    setIsModalOpen(false);
-    setEditingShipment(null);
-    if (currentPage !== 1 && !editingShipment) {
-      setCurrentPage(1);
-    } else {
-      fetchData(); // Refetch data
+    try {
+      if (editingShipment) {
+        // Update existing shipment
+        await api.put(`/shipments/${editingShipment._id}`, currentShipment);
+        showNotification('Shipment updated successfully!', 'success');
+      } else {
+        // Create new shipment
+        await api.post('/shipments', currentShipment);
+        showNotification('Shipment created successfully!', 'success');
+      }
+      setIsModalOpen(false);
+      setEditingShipment(null);
+      if (currentPage !== 1 && !editingShipment) {
+        setCurrentPage(1);
+      } else {
+        fetchData(); // Refetch data
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || `Failed to ${editingShipment ? 'update' : 'create'} shipment.`;
+      showNotification(message, 'error');
+      console.error(err);
     }
   };
 
@@ -109,15 +123,32 @@ const Shipments = () => {
       destination: shipment.destination,
       weight: shipment.weight,
       packageDetails: shipment.packageDetails,
+      agent: shipment.agent?._id || '',
       status: shipment.status,
     });
     setIsModalOpen(true);
   };
 
+  const openViewModal = (shipment) => {
+    setSelectedShipment(shipment);
+    setIsViewModalOpen(true);
+  };
+
+  const closeViewModal = () => {
+    setIsViewModalOpen(false);
+    setSelectedShipment(null);
+  };
+
   const handleDelete = async (shipmentId) => {
     if (window.confirm('Are you sure you want to delete this shipment?')) {
-      await axios.delete(`/api/shipments/${shipmentId}`);
-      fetchData(); // Refetch data
+      try {
+        await api.delete(`/shipments/${shipmentId}`);
+        showNotification('Shipment deleted successfully.', 'success');
+        fetchData(); // Refetch data
+      } catch (err) {
+        showNotification('Failed to delete shipment.', 'error');
+        console.error(err);
+      }
     }
   };
 
@@ -170,6 +201,7 @@ const Shipments = () => {
                 <th className="p-3 text-sm font-semibold text-gray-600">Shipment ID</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Customer</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Origin</th>
+                <th className="p-3 text-sm font-semibold text-gray-600">Agent</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Destination</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Status</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Date</th>
@@ -178,18 +210,18 @@ const Shipments = () => {
             </thead>
             <tbody>
               {loading && <tr><td colSpan="7" className="text-center p-4">Loading...</td></tr>}
-              {error && <tr><td colSpan="7" className="text-center p-4 text-red-500">{error}</td></tr>}
-              {!loading && !error && shipments.map((shipment) => (
+              {!loading && shipments.map((shipment) => (
                 <tr key={shipment._id} className="border-b hover:bg-gray-50">
                   <td className="p-3 text-sm font-medium text-primary">{shipment.shipmentId}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.customer?.name || 'N/A'}</td>
+                  <td className="p-3 text-sm text-gray-500">{shipment.agent?.name || 'Unassigned'}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.origin}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.destination}</td>
                   <td className="p-3 text-sm"><StatusBadge status={shipment.status} /></td>
                   <td className="p-3 text-sm text-gray-500">{format(new Date(shipment.dispatchDate), 'MMM dd, yyyy')}</td>
                   <td className="p-3 text-sm">
                     <div className="flex space-x-2">
-                      <button onClick={() => openEditModal(shipment)} className="text-blue-500 hover:text-blue-700">View</button>
+                      <button onClick={() => openViewModal(shipment)} className="text-blue-500 hover:text-blue-700">View</button>
                       <button onClick={() => openEditModal(shipment)} className="text-green-500 hover:text-green-700">Edit</button>
                       <button onClick={() => handleDelete(shipment._id)} className="text-red-500 hover:text-red-700">Delete</button>
                     </div>
@@ -272,6 +304,17 @@ const Shipments = () => {
                   </div>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Assign Agent</label>
+                  <select
+                    value={currentShipment.agent}
+                    onChange={(e) => setCurrentShipment({ ...currentShipment, agent: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                  >
+                    <option value="">Unassigned</option>
+                    {agents.map(agent => <option key={agent._id} value={agent._id}>{agent.name}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Package Details</label>
                   <textarea value={currentShipment.packageDetails} onChange={(e) => setCurrentShipment({ ...currentShipment, packageDetails: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" rows="3" placeholder="e.g., 1 box of electronics"></textarea>
                 </div>
@@ -292,6 +335,65 @@ const Shipments = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* View Details Modal */}
+      <AnimatePresence>
+        {isViewModalOpen && selectedShipment && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              className="bg-white rounded-lg shadow-2xl w-full max-w-xl"
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+            >
+              <div className="p-6 border-b flex justify-between items-center">
+                <h2 className="text-xl font-bold text-primary">Shipment Details: {selectedShipment.shipmentId}</h2>
+                <StatusBadge status={selectedShipment.status} />
+              </div>
+              <div className="p-6 space-y-4 text-gray-700">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Customer</p>
+                    <p className="font-semibold">{selectedShipment.customer?.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Agent</p>
+                    <p className="font-semibold">{selectedShipment.agent?.name || 'Unassigned'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Origin</p>
+                    <p className="font-semibold">{selectedShipment.origin}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Destination</p>
+                    <p className="font-semibold">{selectedShipment.destination}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Dispatch Date</p>
+                    <p className="font-semibold">{format(new Date(selectedShipment.dispatchDate), 'MMM dd, yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Weight</p>
+                    <p className="font-semibold">{selectedShipment.weight ? `${selectedShipment.weight} kg` : 'N/A'}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Package Details</p>
+                  <p className="font-semibold">{selectedShipment.packageDetails || 'N/A'}</p>
+                </div>
+              </div>
+              <div className="p-6 bg-gray-50 flex justify-end rounded-b-lg">
+                <button onClick={closeViewModal} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">Close</button>
+              </div>
             </motion.div>
           </div>
         )}

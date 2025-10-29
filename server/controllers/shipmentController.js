@@ -30,6 +30,7 @@ export const getShipments = async (req, res) => {
 
     const shipments = await Shipment.find(query)
       .populate('customer', 'name')
+      .populate('agent', 'name')
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip((page - 1) * limit);
@@ -58,7 +59,7 @@ export const getShipments = async (req, res) => {
 // @access  Private/Admin
 export const createShipment = async (req, res) => {
   try {
-    const { customerName, origin, destination, weight, packageDetails, status } = req.body;
+    const { customerName, origin, destination, weight, packageDetails, status, agent } = req.body;
 
     // For simplicity, we'll find the first customer that matches the name.
     // In a real app, you'd likely use a customer ID from a dropdown.
@@ -74,6 +75,7 @@ export const createShipment = async (req, res) => {
       weight,
       packageDetails,
       status,
+      agent: agent || null,
       cost: Math.max(20, weight * 5), // Dummy cost calculation
     });
 
@@ -88,7 +90,14 @@ export const createShipment = async (req, res) => {
 // @access  Private/Admin
 export const updateShipment = async (req, res) => {
   try {
-    const shipment = await Shipment.findByIdAndUpdate(req.params.id, req.body, {
+    const { agent, ...restOfBody } = req.body;
+    const updateData = { ...restOfBody };
+
+    // Handle agent assignment
+    if (agent) updateData.agent = agent;
+    else updateData.$unset = { agent: 1 }; // Unassign agent if not provided
+
+    const shipment = await Shipment.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     });

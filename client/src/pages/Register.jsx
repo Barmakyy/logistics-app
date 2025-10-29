@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
+import { useNotification } from '../context/NotificationContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { showNotification } = useNotification();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -14,14 +14,12 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     try {
-      await axios.post('/api/auth/register', formData);
-      setSuccess('Registration successful! Redirecting to login...');
+      await api.post('/auth/register', formData);
+      showNotification('Registration successful! Redirecting to login...', 'success');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      showNotification(err.response?.data?.message || 'Registration failed. Please try again.', 'error');
     }
   };
 
@@ -29,8 +27,6 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <h2 className="text-2xl font-bold text-center text-primary mb-6">Register</h2>
-        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-        {success && <p className="text-green-500 text-center mb-4">{success}</p>}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700">Name</label>
