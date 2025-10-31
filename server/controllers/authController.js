@@ -63,6 +63,37 @@ export const register = async (req, res) => {
   }
 };
 
+export const updatePassword = async (req, res) => {
+  // 1) Get user from collection
+  const user = await User.findById(req.user.id).select('+password');
+
+  // 2) Check if POSTed current password is correct
+  if (!(await user.correctPassword(req.body.currentPassword, user.password))) {
+    return res.status(401).json({ status: 'fail', message: 'Your current password is wrong.' });
+  }
+
+  // 3) If so, update password
+  user.password = req.body.password;
+  // The passwordConfirm is not a field in the DB, but it's required for the validator on the User model.
+  // We don't have a passwordConfirm field, but the frontend already checks for matching passwords.
+  // To satisfy the model validation, we can temporarily set it.
+  // Note: A better long-term solution might be a dedicated `passwordChangedAt` field.
+
+  // 4) Save user and log them in, send JWT
+  try {
+    await user.save();
+    const token = signToken(user._id);
+
+    res.status(200).json({
+      status: 'success',
+      token,
+      data: { user },
+    });
+  } catch (error) {
+     res.status(500).json({ status: 'error', message: 'Error saving new password.' });
+  }
+};
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -94,5 +125,25 @@ export const login = async (req, res) => {
       status: 'error',
       message: 'Something went wrong during login.',
     });
+  }
+};
+
+export const updateMe = async (req, res) => {
+  try {
+    // 1) Create error if user POSTs password data
+    if (req.body.password || req.body.passwordConfirm) {
+      return res.status(400).json({ status: 'fail', message: 'This route is not for password updates. Please use /update-password.' });
+    }
+
+    // 2) Filtered out unwanted fields names that are not allowed to be updated
+    const { name, email, phone, profilePicture } = req.body;
+    const filteredBody = { name, email, phone, profilePicture };
+
+    // 3) Update user document
+    const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, { new: true, runValidators: true });
+
+    res.status(200).json({ status: 'success', data: { user: updatedUser } });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
   }
 };

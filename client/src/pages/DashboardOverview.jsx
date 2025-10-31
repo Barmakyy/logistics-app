@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import axios from 'axios';
 import { FaShippingFast, FaUsers, FaDollarSign, FaCheckCircle } from 'react-icons/fa';
 import {
@@ -140,7 +140,7 @@ const DashboardOverview = () => {
                 <div className="ml-3">
                   <p className="text-sm text-gray-600">{activity.text}</p>
                   <p className="text-xs text-gray-400">
-                    {activity.timestamp ? `${formatDistanceToNow(new Date(activity.timestamp))} ago` : 'just now'}
+                    {activity.timestamp ? format(new Date(activity.timestamp), 'MMM d, yyyy, h:mm a') : 'just now'}
                   </p>
                 </div>
               </li>

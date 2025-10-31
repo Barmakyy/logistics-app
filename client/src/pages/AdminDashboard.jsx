@@ -1,5 +1,6 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 import {
   FaTachometerAlt,
   FaTruck,
@@ -13,12 +14,10 @@ import {
   FaSearch,
   FaBell,
   FaUserCircle,
-  FaSun,
-  FaMoon,
+  FaSignOutAlt
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 
 const sidebarVariants = {
   open: {
@@ -99,8 +98,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         animate={isOpen ? 'open' : 'closed'}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       >
-        <Link to="/" className="text-white text-2xl font-bold px-4">
-          Bongo<span className="text-accent">Express</span>
+        <Link to="/" className="text-white text-2xl font-bold px-4 flex items-center">
+          <>Bongo<span className="text-accent">Express</span></>
         </Link>
 
         <nav>
@@ -118,15 +117,36 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
   );
 };
 
-const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
-  const { theme, toggleTheme } = useTheme();
+const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen, user }) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const { user: authUser, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownRef]);
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center">
+    <header className="bg-white shadow-sm p-4 flex justify-between items-center">
       {/* Hamburger Menu for mobile */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="text-gray-500 dark:text-gray-400 focus:outline-none lg:hidden"
+        className="text-gray-500 focus:outline-none lg:hidden"
       >
         {isSidebarOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
       </button>
@@ -137,28 +157,36 @@ const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
         <input
           type="text"
           placeholder="Search shipments, customers..."
-          className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-primary border border-gray-200 dark:border-gray-600 rounded-full py-2 pl-10 pr-4 w-80 transition-all"
+          className="bg-gray-100 focus:bg-white focus:ring-2 focus:ring-primary border border-gray-200 rounded-full py-2 pl-10 pr-4 w-80 transition-all"
         />
       </div>
 
       {/* Right-side icons and profile */}
-      <div className="flex items-center space-x-4">
-        <button
-          onClick={toggleTheme}
-          className="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-accent focus:outline-none"
-          aria-label="Toggle dark mode"
-        >
-          {theme === 'light' ? <FaMoon size={20} /> : <FaSun size={22} />}
-        </button>
-        <button className="text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-accent">
+      <div className="flex items-center space-x-6">
+        <button className="text-gray-500 hover:text-primary">
           <FaBell size={22} />
         </button>
-        <div className="relative">
-          <button className="flex items-center space-x-2">
-            <FaUserCircle size={28} className="text-gray-600 dark:text-gray-300" />
-            <span className="hidden md:inline font-medium text-gray-700 dark:text-gray-200">Admin</span>
+        <div className="relative" ref={dropdownRef}>
+          <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2">
+            {user?.profilePicture ? (
+              <img src={`http://localhost:5000${user.profilePicture}`} alt="Admin" className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <FaUserCircle size={28} className="text-gray-600" />
+            )}
+            <span className="hidden md:inline font-medium text-gray-700">{user?.name || 'Admin'}</span>
           </button>
-          {/* Dropdown would go here */}
+          <AnimatePresence>
+            {dropdownOpen && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl z-20 py-1">
+                <Link to="/admin/dashboard/settings" onClick={() => setDropdownOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <FaCog className="inline mr-2" />Settings
+                </Link>
+                <button onClick={handleLogout} className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <FaSignOutAlt className="inline mr-2" />Logout
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </header>
@@ -167,12 +195,30 @@ const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
 const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const { user } = useContext(AuthContext);
+  const [companyLogo, setCompanyLogo] = useState('');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get('/settings');
+        setCompanyLogo(response.data.data.settings.logo);
+      } catch (error) {
+        console.error('Failed to load settings for dashboard display.');
+      }
+    };
+    fetchSettings();
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNavbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+        <TopNavbar
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          user={user}
+        />
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div

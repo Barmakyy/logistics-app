@@ -17,6 +17,7 @@ const settingSchema = new mongoose.Schema(
       instagram: String,
       linkedin: String,
     },
+    logo: { type: String, default: '' },
 
     // Notification Settings
     notifications: {
@@ -24,12 +25,6 @@ const settingSchema = new mongoose.Schema(
       emailAlertsNewMessages: { type: Boolean, default: false },
       emailAlertsPaymentConfirmations: { type: Boolean, default: true },
       whatsappNotifications: { type: Boolean, default: false },
-    },
-
-    // Theme Preferences
-    theme: {
-      darkMode: { type: Boolean, default: false },
-      accentColor: { type: String, default: 'yellow' },
     },
   },
   { timestamps: true },

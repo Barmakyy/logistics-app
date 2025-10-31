@@ -10,6 +10,7 @@ import paymentRouter from './routes/paymentRoutes.js';
 import agentRouter from './routes/agentRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import settingRouter from './routes/settingRoutes.js';
+import uploadRouter from './routes/uploadRoutes.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -20,6 +21,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static('uploads'));
+
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
@@ -29,6 +33,7 @@ app.use('/api/agents', agentRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/settings', settingRouter);
+app.use('/api/uploads', uploadRouter);
 
 // A simple test route
 app.get('/api/test', (req, res) => {

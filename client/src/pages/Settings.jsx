@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { FaUser, FaBuilding, FaBell, FaPalette, FaCheck } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import { FaUser, FaBuilding, FaBell, FaCheck } from 'react-icons/fa';
 import api from '../api/axios';
 import { useNotification } from '../context/NotificationContext';
-import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 const Settings = () => {
   const { showNotification } = useNotification();
-  const { theme: currentTheme, toggleTheme } = useTheme();
+  const { user, setUser } = useAuth();
   const [settings, setSettings] = useState({
     companyName: '',
     companyEmail: '',
@@ -20,11 +20,22 @@ const Settings = () => {
       emailAlertsPaymentConfirmations: true,
       whatsappNotifications: false,
     },
-    theme: { darkMode: false, accentColor: 'yellow' },
   });
-  const [adminProfile, setAdminProfile] = useState({ name: 'Admin User', email: 'admin@example.com', phone: '' });
+  const [adminProfile, setAdminProfile] = useState({ name: user?.name || 'Admin User', email: user?.email || 'admin@example.com', phone: user?.phone || '' });
   const [loading, setLoading] = useState(true);
 
+  // State for password change
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+
+  // State for image previews
+  const [profilePicturePreview, setProfilePicturePreview] = useState(user?.profilePicture ? `http://localhost:5000${user.profilePicture}` : null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState(null);
+
+
+  const [profilePictureFile, setProfilePictureFile] = useState(null);
+  const [companyLogoFile, setCompanyLogoFile] = useState(null);
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -36,18 +47,21 @@ const Settings = () => {
           companyPhone: fetchedSettings.companyPhone || '',
           address: fetchedSettings.address || '',
           website: fetchedSettings.website || '',
-          socialLinks: fetchedSettings.socialLinks || { facebook: '', whatsapp: '', instagram: '', linkedin: '' },
-          notifications: fetchedSettings.notifications || { emailAlertsNewShipments: true, emailAlertsNewMessages: false, emailAlertsPaymentConfirmations: true, whatsappNotifications: false },
-          theme: fetchedSettings.theme || { darkMode: false, accentColor: 'yellow' },
+          logo: fetchedSettings.logo || '',
+          socialLinks: { facebook: '', whatsapp: '', instagram: '', linkedin: '', ...fetchedSettings.socialLinks },
+          notifications: { emailAlertsNewShipments: true, emailAlertsNewMessages: false, emailAlertsPaymentConfirmations: true, whatsappNotifications: false, ...fetchedSettings.notifications },
         });
+        if (fetchedSettings.logo) setCompanyLogoPreview(`http://localhost:5000${fetchedSettings.logo}`);
       } catch (error) {
         showNotification('Failed to load settings.', 'error');
       } finally {
         setLoading(false);
       }
     };
-    fetchSettings();
-  }, [showNotification]);
+    if (user) {
+      fetchSettings();
+    }
+  }, [showNotification, user]);
 
   const handleSettingChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -64,18 +78,88 @@ const Settings = () => {
   };
 
   const handleSaveChanges = async () => {
-    // Before saving, update the theme based on the toggle
-    const newSettings = { ...settings, theme: { ...settings.theme, darkMode: currentTheme === 'dark' } };
+    try {
+      let updatedSettings = { ...settings };
+      // Upload company logo if a new one is selected
+      if (companyLogoFile) {
+        const logoFormData = new FormData();
+        logoFormData.append('companyLogo', companyLogoFile);
+        const logoRes = await api.post('/uploads/company-logo', logoFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        updatedSettings.logo = logoRes.data.filePath;
+      }
 
-    api.put('/settings', newSettings)
-      .then(() => {
-        showNotification('Settings saved successfully!', 'success');
-        // Apply theme change immediately
-        document.documentElement.classList.toggle('dark', newSettings.theme.darkMode);
-      })
-      .catch(() => {
-        showNotification('Failed to save settings.', 'error');
+      let updatedAdminProfile = { ...adminProfile };
+
+      // Upload profile picture if a new one is selected
+      if (profilePictureFile) {
+        const profileFormData = new FormData();
+        profileFormData.append('profilePicture', profilePictureFile);
+        const profileRes = await api.post('/uploads/profile-picture', profileFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        updatedAdminProfile.profilePicture = profileRes.data.filePath;
+      }
+
+      // Update admin profile info (name, email, phone, and new picture)
+      const adminUpdateRes = await api.patch('/auth/update-me', updatedAdminProfile);
+      setUser({ ...user, ...adminUpdateRes.data.data.user });
+
+      // Save all other settings
+      await api.put('/settings', updatedSettings);
+
+      showNotification('Settings saved successfully!', 'success');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      showNotification(error.response?.data?.message || 'Failed to save settings.', 'error');
+    }
+  };
+
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePictureFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setProfilePicturePreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCompanyLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCompanyLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setCompanyLogoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (newPassword !== passwordConfirm) {
+      showNotification('New passwords do not match.', 'error');
+      return;
+    }
+    if (newPassword.length < 8) {
+      showNotification('Password must be at least 8 characters long.', 'error');
+      return;
+    }
+
+    try {
+      await api.patch('/auth/update-password', {
+        currentPassword,
+        password: newPassword,
+        passwordConfirm,
       });
+      showNotification('Password updated successfully!', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setPasswordConfirm('');
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to update password.', 'error');
+    }
   };
 
   if (loading) {
@@ -104,12 +188,22 @@ const Settings = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Profile Picture</label>
-            <input type="file" className="mt-1 block w-full text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
+            <div className="mt-1 flex items-center space-x-4">
+              {profilePicturePreview && (
+                <img src={profilePicturePreview} alt="Profile Preview" className="w-16 h-16 rounded-full object-cover" />
+              )}
+              <input type="file" accept="image/*" onChange={handleProfilePictureChange} className="block w-full text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-dark file:text-white hover:file:bg-primary" />
+            </div>
           </div>
-          <div>
+          <form onSubmit={handlePasswordChange} className="space-y-3 border-t pt-4 mt-4">
             <label className="block text-sm font-medium text-gray-700">Change Password</label>
-            <input type="password" placeholder="New Password" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
-          </div>
+            <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
+            <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
+            <input type="password" placeholder="Confirm New Password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
+            <button type="submit" className="w-full bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+              Update Password
+            </button>
+          </form>
         </div>
       </div>
 
@@ -155,7 +249,12 @@ const Settings = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Logo</label>
-            <input type="file" className="mt-1 block w-full text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" />
+            <div className="mt-1 flex items-center space-x-4">
+              {companyLogoPreview && (
+                <img src={companyLogoPreview} alt="Logo Preview" className="w-16 h-16 object-contain" />
+              )}
+              <input type="file" accept="image/*" onChange={handleCompanyLogoChange} className="block w-full text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-dark file:text-white hover:file:bg-primary" />
+            </div>
           </div>
         </div>
       </div>
@@ -180,25 +279,6 @@ const Settings = () => {
             <input type="checkbox" name="notifications.whatsappNotifications" checked={settings.notifications.whatsappNotifications} onChange={handleSettingChange} className="form-checkbox h-5 w-5 text-primary rounded focus:ring-primary" />
             <span className="ml-2 text-gray-700">Enable WhatsApp notifications</span>
           </label>
-        </div>
-      </div>
-
-      {/* 4. Theme Preferences */}
-      <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center"><FaPalette className="mr-2" /> Theme Preferences</h2>
-        <div className="space-y-3">
-          <label className="inline-flex items-center">
-            <input type="checkbox" checked={currentTheme === 'dark'} onChange={toggleTheme} className="form-checkbox h-5 w-5 text-primary rounded focus:ring-primary" />
-            <span className="ml-2 text-gray-700">Dark Mode</span>
-          </label>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Accent Color</label>
-            <select name="theme.accentColor" value={settings.theme.accentColor} onChange={handleSettingChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
-              <option value="yellow">Yellow</option>
-              <option value="blue">Blue</option>
-              <option value="green">Green</option>
-            </select>
-          </div>
         </div>
       </div>
 

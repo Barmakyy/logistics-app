@@ -19,6 +19,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.1",
+    "multer": "^2.0.2",
     "nanoid": "^5.0.7",
     "nodemailer": "^7.0.10",
     "validator": "^13.12.0"
