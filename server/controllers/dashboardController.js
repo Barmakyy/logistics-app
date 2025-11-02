@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Shipment from '../models/Shipment.js';
+import Payment from '../models/Payment.js';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 
 export const getStats = async (req, res) => {
@@ -8,9 +9,9 @@ export const getStats = async (req, res) => {
     const totalShipments = await Shipment.countDocuments();
     const totalCustomers = await User.countDocuments({ role: 'customer' });
 
-    const revenueResult = await Shipment.aggregate([
-      { $match: { status: 'delivered' } },
-      { $group: { _id: null, totalRevenue: { $sum: '$cost' } } },
+    const revenueResult = await Payment.aggregate([
+      { $match: { status: 'Completed' } },
+      { $group: { _id: null, totalRevenue: { $sum: '$amount' } } },
     ]);
     const totalRevenue = revenueResult[0]?.totalRevenue || 0;
 
@@ -20,7 +21,7 @@ export const getStats = async (req, res) => {
           _id: null,
           total: { $sum: 1 },
           delivered: {
-            $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ['$status', 'Delivered'] }, 1, 0] },
           },
         },
       },
@@ -35,7 +36,81 @@ export const getStats = async (req, res) => {
     const firstDayOfPeriod = startOfMonth(sixMonthsAgo);
 
     const shipmentCounts = await Shipment.aggregate([
-      { $match: { createdAt: { $gte: firstDayOfPeriod } } },
+      { $match: { createdAt: { $gte: firstDayOfPeriod } } }, // Filter for the last 6 months
+      {
+        $group: {
+          _id: {
+            month: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            status: '$status',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.month',
+          statuses: { $push: { status: '$_id.status', count: '$count' } },
+        },
+      },
+      {
+        $addFields: {
+          statuses: {
+            $arrayToObject: {
+              $map: {
+                input: '$statuses',
+                as: 's',
+                in: { k: '$$s.status', v: '$$s.count' },
+              },
+            },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), 5 - i), 'MMM'));
+
+    // Format for recharts
+    const shipmentData = months.map(monthName => {
+      const monthData = shipmentCounts.find(item => format(new Date(item._id), 'MMM') === monthName);
+      return {
+        name: monthName,
+        Delivered: monthData?.statuses?.Delivered || 0,
+        Pending: monthData?.statuses?.Pending || 0,
+        'In Transit': monthData?.statuses['In Transit'] || 0,
+        Cancelled: monthData?.statuses?.Cancelled || 0,
+        Delayed: monthData?.statuses?.Delayed || 0,
+      };
+    });
+
+    // 3. Revenue & Expenses Chart Data (last 6 months)
+    const revenueByMonth = await Payment.aggregate([
+      { $match: { transactionDate: { $gte: firstDayOfPeriod }, status: 'Completed' } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$transactionDate' } },
+          revenue: { $sum: '$amount' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Format for recharts
+    const revenueData = revenueByMonth.map(item => ({
+        name: format(new Date(item._id), 'MMM'),
+        revenue: item.revenue,
+    }));
+
+    // New Charts Data
+    // 3. Shipment Status Distribution (Pie Chart)
+    const statusDistribution = await Shipment.aggregate([
+      { $group: { _id: '$status', value: { $sum: 1 } } },
+      { $project: { name: '$_id', value: 1, _id: 0 } },
+    ]);
+
+    // 4. Customer Growth (Area Chart)
+    const customerGrowth = await User.aggregate([
+      { $match: { role: 'customer', createdAt: { $gte: firstDayOfPeriod } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
@@ -45,31 +120,28 @@ export const getStats = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    // Format for recharts
-    const shipmentData = shipmentCounts.map(item => ({
-        name: format(new Date(item._id), 'MMM'),
-        shipments: item.count
-    }));
+    const customerGrowthData = months.map(monthName => {
+      const monthData = customerGrowth.find(item => format(new Date(item._id), 'MMM') === monthName);
+      return { name: monthName, customers: monthData?.count || 0 };
+    });
 
-    // 3. Revenue & Expenses Chart Data (last 6 months)
-    const revenueAndExpenses = await Shipment.aggregate([
-      { $match: { createdAt: { $gte: firstDayOfPeriod }, status: 'delivered' } },
+    // 5. Top Performing Agents (Bar Chart)
+    const topAgents = await Shipment.aggregate([
+      { $match: { status: 'Delivered', agent: { $ne: null } } },
+      { $group: { _id: '$agent', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
       {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          revenue: { $sum: '$cost' },
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'agentDetails',
         },
       },
-      { $sort: { _id: 1 } },
+      { $unwind: '$agentDetails' },
+      { $project: { name: '$agentDetails.name', deliveries: '$count' } },
     ]);
-
-    // Format for recharts and add dummy expenses
-    const revenueData = revenueAndExpenses.map(item => ({
-        name: format(new Date(item._id), 'MMM'),
-        revenue: item.revenue,
-        // Generating dummy expenses as 60% of revenue for demonstration
-        expenses: Math.floor(item.revenue * 0.6),
-    }));
 
     // 4. Recent Activities
     const recentShipments = await Shipment.find()
@@ -107,7 +179,10 @@ export const getStats = async (req, res) => {
         },
         charts: {
           shipmentData,
-          revenueData,
+          revenueData, // This is now a line chart
+          statusDistribution,
+          customerGrowthData,
+          topAgents,
         },
         recentActivities: activities,
       },

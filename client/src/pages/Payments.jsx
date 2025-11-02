@@ -116,6 +116,21 @@ const Payments = () => {
     }
   };
 
+  const handleDownloadInvoice = (paymentId) => {
+    api.get(`/payments/${paymentId}/invoice`, { responseType: 'blob' })
+      .then(response => {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `receipt-${selectedPayment.paymentId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showNotification('Invoice download started.', 'success');
+      })
+      .catch(() => showNotification('Failed to download invoice.', 'error'));
+  };
+
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.95 },
     visible: { opacity: 1, scale: 1 },
@@ -289,8 +304,11 @@ const Payments = () => {
                 <button onClick={closeModal} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
                   Close
                 </button>
-                <button className="bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-colors flex items-center">
-                  <FaDownload className="mr-2" /> Download Invoice
+                <button
+                  onClick={() => handleDownloadInvoice(selectedPayment._id)}
+                  className="bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-colors flex items-center"
+                >
+                  <FaDownload className="mr-2" /> Download Receipt
                 </button>
               </div>
             </motion.div>

@@ -50,6 +50,7 @@ const Shipments = () => {
   const [currentShipment, setCurrentShipment] = useState(initialFormState);
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 10;
+  const [searchTerm, setSearchTerm] = useState('');
   const [editingShipment, setEditingShipment] = useState(null);
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -63,7 +64,7 @@ const Shipments = () => {
     try {
       setLoading(true);
       const [shipmentsRes, summaryRes, agentsRes] = await Promise.all([
-        api.get(`/shipments?page=${currentPage}&limit=${limit}`),
+        api.get(`/shipments?page=${currentPage}&limit=${limit}&search=${searchTerm}`),
         api.get('/shipments/summary'),
         api.get('/agents/list'),
       ]);
@@ -82,6 +83,14 @@ const Shipments = () => {
   useEffect(() => {
     fetchData();
   }, [currentPage]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) setCurrentPage(1);
+      else fetchData();
+    }, 300); // Debounce search
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -189,6 +198,8 @@ const Shipments = () => {
             <input
               type="text"
               placeholder="Search by customer or ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-100 focus:bg-white focus:ring-2 focus:ring-primary border border-gray-200 rounded-full py-2 pl-10 pr-4 transition-all"
             />
           </div>
@@ -261,65 +272,65 @@ const Shipments = () => {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              className="bg-white rounded-lg shadow-2xl w-full max-w-2xl"
-              variants={modalVariants}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-              <div className="p-6 border-b">
-                <h2 className="text-xl font-bold text-primary">{editingShipment ? 'Edit' : 'Create New'} Shipment</h2>
+            <motion.div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" variants={modalVariants} initial="hidden" animate="visible" exit="hidden">
+              <div className="p-6 border-b shrink-0">
+                <h2 className="text-xl font-bold text-primary">
+                  {editingShipment ? 'Edit' : 'Create New'} Shipment
+                </h2>
               </div>
-              <form className="p-6" onSubmit={handleFormSubmit}>
-                <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Customer Name</label>
-                  <input type="text" value={currentShipment.customerName} onChange={(e) => setCurrentShipment({ ...currentShipment, customerName: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., John Doe" required disabled={!!editingShipment} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form className="p-6 overflow-y-auto" onSubmit={handleFormSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Column 1 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Origin</label>
-                    <input type="text" value={currentShipment.origin} onChange={(e) => setCurrentShipment({ ...currentShipment, origin: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., Mombasa" required />
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Shipment Info</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Customer Name</label>
+                        <input type="text" value={currentShipment.customerName} onChange={(e) => setCurrentShipment({ ...currentShipment, customerName: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., John Doe" required disabled={!!editingShipment} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Origin</label>
+                        <input type="text" value={currentShipment.origin} onChange={(e) => setCurrentShipment({ ...currentShipment, origin: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., Mombasa" required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Destination</label>
+                        <input type="text" value={currentShipment.destination} onChange={(e) => setCurrentShipment({ ...currentShipment, destination: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., Nairobi" required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Package Details</label>
+                        <textarea value={currentShipment.packageDetails} onChange={(e) => setCurrentShipment({ ...currentShipment, packageDetails: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" rows="3" placeholder="e.g., 1 box of electronics"></textarea>
+                      </div>
+                    </div>
                   </div>
+                  {/* Column 2 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Destination</label>
-                    <input type="text" value={currentShipment.destination} onChange={(e) => setCurrentShipment({ ...currentShipment, destination: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., Nairobi" required />
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Logistics</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Weight (kg)</label>
+                        <input type="number" value={currentShipment.weight} onChange={(e) => setCurrentShipment({ ...currentShipment, weight: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., 25" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Status</label>
+                        <select value={currentShipment.status} onChange={(e) => setCurrentShipment({ ...currentShipment, status: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                          <option>Pending</option>
+                          <option>In Transit</option>
+                          <option>Delivered</option>
+                          <option>Delayed</option>
+                          <option>Cancelled</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Assign Agent</label>
+                        <select value={currentShipment.agent} onChange={(e) => setCurrentShipment({ ...currentShipment, agent: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                          <option value="">Unassigned</option>
+                          {agents.map(agent => <option key={agent._id} value={agent._id}>{agent.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Weight (kg)</label>
-                    <input type="number" value={currentShipment.weight} onChange={(e) => setCurrentShipment({ ...currentShipment, weight: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="e.g., 25" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Status</label>
-                    <select value={currentShipment.status} onChange={(e) => setCurrentShipment({ ...currentShipment, status: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
-                      <option>Pending</option>
-                      <option>In Transit</option>
-                      <option>Delivered</option>
-                      <option>Delayed</option>
-                      <option>Cancelled</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Assign Agent</label>
-                  <select
-                    value={currentShipment.agent}
-                    onChange={(e) => setCurrentShipment({ ...currentShipment, agent: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Unassigned</option>
-                    {agents.map(agent => <option key={agent._id} value={agent._id}>{agent.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Package Details</label>
-                  <textarea value={currentShipment.packageDetails} onChange={(e) => setCurrentShipment({ ...currentShipment, packageDetails: e.target.value })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" rows="3" placeholder="e.g., 1 box of electronics"></textarea>
-                </div>
-                </div>
-                <div className="mt-6 pt-4 border-t flex justify-end space-x-3">
+                <div className="mt-6 pt-6 border-t flex justify-end space-x-3 shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}

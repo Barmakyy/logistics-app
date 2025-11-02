@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import axios from 'axios';
+import api from '../api/axios';
 import { FaShippingFast, FaUsers, FaDollarSign, FaCheckCircle } from 'react-icons/fa';
 import {
   ResponsiveContainer,
@@ -12,8 +12,13 @@ import {
   Area,
   CartesianGrid,
   BarChart,
+  LineChart,
   Bar,
   Legend,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 const MetricCard = ({ icon, title, value }) => {
@@ -42,7 +47,7 @@ const DashboardOverview = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/dashboard/stats');
+        const response = await api.get('/dashboard/stats');
         setStats(response.data.data);
         setError('');
       } catch (err) {
@@ -77,7 +82,7 @@ const DashboardOverview = () => {
     {
       icon: <FaDollarSign size={24} />,
       title: 'Total Revenue',
-      value: `$${(stats?.metrics?.totalRevenue || 0).toLocaleString()}`,
+      value: `KSh ${(stats?.metrics?.totalRevenue || 0).toLocaleString()}`,
     },
     {
       icon: <FaCheckCircle size={24} />,
@@ -97,35 +102,91 @@ const DashboardOverview = () => {
         ))}
       </div>
 
-      {/* Charts and Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        <motion.div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <h3 className="text-lg font-semibold text-primary mb-4">Shipments Over Time</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={stats?.charts?.shipmentData || []}>
+      {/* Row 1: Shipment Growth & Status Distribution */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mt-8">
+        <motion.div className="xl:col-span-3 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <h3 className="text-lg font-semibold text-primary mb-4">Shipment Growth Over Time</h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={stats?.charts?.shipmentData || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis dataKey="name" tick={{ fill: '#6b7280' }} />
+              <YAxis tick={{ fill: '#6b7280' }} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '0.5rem', border: '1px solid #e0e0e0' }} />
+              <Legend />
+              <Line type="monotone" dataKey="Delivered" stroke="#2FC25B" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="Pending" stroke="#FACC14" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="Cancelled" stroke="#F04864" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        <motion.div className="xl:col-span-2 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+          <h3 className="text-lg font-semibold text-primary mb-4">Shipment Status Distribution</h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <PieChart>
+              <Pie data={stats?.charts?.statusDistribution || []} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} innerRadius={80} paddingAngle={5} labelLine={false} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {(stats?.charts?.statusDistribution || []).map((entry, index) => <Cell key={`cell-${index}`} fill={['#2FC25B', '#1890FF', '#FACC14', '#F04864', '#8543E0'][index % 5]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend iconType="circle" />
+            </PieChart>
+          </ResponsiveContainer>
+        </motion.div>
+      </div>
+
+      {/* Row 2: Revenue & Customer Growth */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mt-8">
+        <motion.div className="xl:col-span-3 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+          <h3 className="text-lg font-semibold text-primary mb-4">Monthly Revenue</h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={stats?.charts?.revenueData || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis dataKey="name" tick={{ fill: '#6b7280' }} />
+              <YAxis tickFormatter={(value) => `KSh ${value / 1000}k`} tick={{ fill: '#6b7280' }} />
+              <Tooltip formatter={(value) => [`KSh ${value.toLocaleString()}`, 'Revenue']} contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '0.5rem', border: '1px solid #e0e0e0' }} />
+              <Legend />
+              <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        <motion.div className="xl:col-span-2 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+          <h3 className="text-lg font-semibold text-primary mb-4">Customer Growth</h3>
+          <ResponsiveContainer width="100%" height={350}>
+            <AreaChart data={stats?.charts?.customerGrowthData || []}>
               <defs>
-                <linearGradient id="colorShipments" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FBBF24" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#FBBF24" stopOpacity={0} />
+                <linearGradient id="colorCustomers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
               <XAxis dataKey="name" tick={{ fill: '#6b7280' }} />
               <YAxis tick={{ fill: '#6b7280' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(5px)',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '0.5rem',
-                }}
-              />
-              <Area type="monotone" dataKey="shipments" stroke="#FBBF24" fillOpacity={1} fill="url(#colorShipments)" />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '0.5rem', border: '1px solid #e0e0e0' }} />
+              <Area type="monotone" dataKey="customers" stroke="#82ca9d" fillOpacity={1} fill="url(#colorCustomers)" />
             </AreaChart>
           </ResponsiveContainer>
         </motion.div>
+      </div>
 
-        <motion.div className="bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+      {/* Row 3: Top Agents & Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        <motion.div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
+          <h3 className="text-lg font-semibold text-primary mb-4">Top Performing Agents</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart layout="vertical" data={stats?.charts?.topAgents || []} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis type="number" tick={{ fill: '#6b7280' }} />
+              <YAxis type="category" dataKey="name" tick={{ fill: '#6b7280' }} width={80} />
+              <Tooltip cursor={{ fill: 'rgba(240, 240, 240, 0.5)' }} contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '0.5rem', border: '1px solid #e0e0e0' }} />
+              <Legend />
+              <Bar dataKey="deliveries" fill="#1890FF" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        <motion.div className="bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
           <h3 className="text-lg font-semibold text-primary mb-4">Recent Activity</h3>
           <ul className="space-y-4">
             {(stats?.recentActivities || []).map(activity => (
@@ -148,28 +209,6 @@ const DashboardOverview = () => {
           </ul>
         </motion.div>
       </div>
-
-      <motion.div className="mt-8 bg-white p-6 rounded-lg shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-        <h3 className="text-lg font-semibold text-primary mb-4">Revenue vs. Expenses</h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={stats?.charts?.revenueData || []}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis dataKey="name" tick={{ fill: '#6b7280' }} />
-            <YAxis tickFormatter={(value) => `$${value / 1000}k`} tick={{ fill: '#6b7280' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(5px)',
-                border: '1px solid #e0e0e0',
-                borderRadius: '0.5rem',
-              }}
-            />
-            <Legend />
-            <Bar dataKey="revenue" fill="#0B1D3A" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="expenses" fill="#FBBF24" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </motion.div>
     </motion.div>
   );
 };

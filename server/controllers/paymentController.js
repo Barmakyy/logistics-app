@@ -1,6 +1,8 @@
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
 import Shipment from '../models/Shipment.js';
+import PDFDocument from 'pdfkit';
+import { format } from 'date-fns';
 
 // @desc    Get all payments with pagination and search
 // @route   GET /api/payments
@@ -53,6 +55,99 @@ export const getPayments = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// @desc    Generate and download an invoice for a payment
+// @route   GET /api/payments/:id/invoice
+// @access  Private/Admin
+export const generateInvoice = async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id)
+      .populate('customer', 'name email address phone')
+      .populate('shipment', 'shipmentId origin destination packageDetails');
+
+    if (!payment) {
+      return res.status(404).json({ status: 'fail', message: 'Payment not found' });
+    }
+
+    const doc = new PDFDocument({ size: [240, 500], margin: 20 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt-${payment.paymentId}.pdf`);
+
+    doc.pipe(res);
+
+    // --- Helper Functions ---
+    const primaryColor = '#0B1D3A';
+    const secondaryColor = '#FBBF24';
+    const lightGray = '#E5E7EB';
+    const darkGray = '#4B5563';
+
+    const drawSection = (title, contentFn) => {
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(primaryColor).text(title);
+      doc.moveDown(0.5);
+      doc.save();
+      contentFn();
+      doc.restore();
+      doc.moveDown(1.5);
+    };
+
+    // --- Header ---
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(primaryColor).text('BongoExpress', { align: 'center' });
+    doc.font('Helvetica').fontSize(8).fillColor(darkGray).text('123 Logistics Lane, Mombasa, Kenya', { align: 'center' });
+    doc.moveDown(2);
+
+    // --- Title ---
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(primaryColor).text('PAYMENT RECEIPT', { align: 'center' });
+    doc.moveDown(2);
+
+    // --- Payment Details ---
+    drawSection('Payment Details', () => {
+      doc.font('Helvetica').fontSize(9).fillColor(darkGray);
+      doc.text(`Receipt ID: ${payment.paymentId}`);
+      doc.text(`Date: ${format(new Date(payment.transactionDate), 'MMM dd, yyyy, h:mm a')}`);
+      doc.text(`Method: ${payment.method}`);
+    });
+
+    // --- Billed To ---
+    drawSection('Billed To', () => {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(darkGray).text(payment.customer.name);
+      doc.font('Helvetica').text(payment.customer.email || 'N/A');
+      doc.text(payment.customer.phone || 'N/A');
+    });
+
+    // --- Items Table ---
+    const tableTop = doc.y;
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text('Description', 20, tableTop).text('Amount', 0, tableTop, { align: 'right' });
+    doc.moveTo(20, doc.y).lineTo(doc.page.width - 20, doc.y).strokeColor(lightGray).stroke();
+    doc.moveDown(0.5);
+
+    const itemY = doc.y;
+    doc.font('Helvetica').fontSize(9);
+    const description = `Shipment Fee (${payment.shipment.shipmentId})`;
+    doc.text(description, 20, itemY, { width: 150 }).text(`KSh ${payment.amount.toLocaleString()}`, 0, itemY, { align: 'right' });
+    doc.y += 15; // Add space for the item row
+    doc.moveTo(20, doc.y).lineTo(doc.page.width - 20, doc.y).strokeColor(lightGray).stroke();
+    doc.moveDown(1);
+
+    // --- Total ---
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(primaryColor);
+    doc.text('TOTAL', 20, doc.y, { align: 'right' }).text(`KSh ${payment.amount.toLocaleString()}`, 0, doc.y, { align: 'right' });
+    doc.moveDown(2.5);
+
+    // --- "PAID" Stamp ---
+    if (payment.status === 'Completed') {
+      doc.fontSize(16).font('Helvetica-Bold').fillColor(secondaryColor).text('PAID', { align: 'center' });
+    }
+
+    // --- Footer ---
+    doc.fontSize(8).fillColor(darkGray).text('Thank you for your business!', 20, doc.page.height - 30, { align: 'center', width: doc.page.width - 40 });
+
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Failed to generate invoice.', error: error.message });
   }
 };
 
