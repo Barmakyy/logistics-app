@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import Shipment from '../models/Shipment.js';
 import Payment from '../models/Payment.js';
-import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths, format, addMinutes } from 'date-fns';
 
 export const getStats = async (req, res) => {
   try {
@@ -32,8 +32,12 @@ export const getStats = async (req, res) => {
         : 0;
 
     // 2. Shipments Chart Data (last 6 months)
-    const sixMonthsAgo = subMonths(new Date(), 5);
+    const now = new Date();
+    // To avoid timezone issues, we work with UTC dates
+    const utcNow = addMinutes(now, now.getTimezoneOffset());
+    const sixMonthsAgo = subMonths(utcNow, 5);
     const firstDayOfPeriod = startOfMonth(sixMonthsAgo);
+
 
     const shipmentCounts = await Shipment.aggregate([
       { $match: { createdAt: { $gte: firstDayOfPeriod } } }, // Filter for the last 6 months
@@ -68,18 +72,18 @@ export const getStats = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), 5 - i), 'MMM'));
+    const months = Array.from({ length: 6 }, (_, i) => format(subMonths(utcNow, 5 - i), 'MMM'));
 
     // Format for recharts
     const shipmentData = months.map(monthName => {
-      const monthData = shipmentCounts.find(item => format(new Date(item._id), 'MMM') === monthName);
+      // item._id is 'YYYY-MM'. Add '-01T12:00:00Z' to force UTC interpretation
+      const monthData = shipmentCounts.find(item => format(new Date(`${item._id}-01T12:00:00Z`), 'MMM') === monthName);
       return {
         name: monthName,
         Delivered: monthData?.statuses?.Delivered || 0,
         Pending: monthData?.statuses?.Pending || 0,
         'In Transit': monthData?.statuses['In Transit'] || 0,
         Cancelled: monthData?.statuses?.Cancelled || 0,
-        Delayed: monthData?.statuses?.Delayed || 0,
       };
     });
 
@@ -95,10 +99,14 @@ export const getStats = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    // Format for recharts
-    const revenueData = revenueByMonth.map(item => ({
-        name: format(new Date(item._id), 'MMM'),
-        revenue: item.revenue,
+    // Create a map for efficient lookup
+    const revenueMap = new Map(
+      revenueByMonth.map(item => [format(new Date(`${item._id}-01T12:00:00Z`), 'MMM'), item.revenue])
+    );
+
+    const revenueData = months.map(monthName => ({
+      name: monthName,
+      revenue: revenueMap.get(monthName) || 0,
     }));
 
     // New Charts Data
@@ -120,10 +128,19 @@ export const getStats = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    const customerGrowthData = months.map(monthName => {
-      const monthData = customerGrowth.find(item => format(new Date(item._id), 'MMM') === monthName);
-      return { name: monthName, customers: monthData?.count || 0 };
-    });
+    // Create a map for efficient lookup
+    const customerGrowthMap = new Map(
+      customerGrowth.map(item => {
+        // item._id is 'YYYY-MM'. Add '-01T12:00:00Z' to force UTC interpretation
+        const monthName = format(new Date(`${item._id}-01T12:00:00Z`), 'MMM');
+        return [monthName, item.count];
+      })
+    );
+
+    const customerGrowthData = months.map(monthName => ({
+      name: monthName,
+      customers: customerGrowthMap.get(monthName) || 0,
+    }));
 
     // 5. Top Performing Agents (Bar Chart)
     const topAgents = await Shipment.aggregate([

@@ -40,6 +40,9 @@ const userSchema = new mongoose.Schema({
     minlength: 8,
     select: false, // Do not include in query results by default
   },
+},
+{
+  timestamps: true, // Add createdAt and updatedAt fields
 });
 
 userSchema.pre('save', async function (next) {

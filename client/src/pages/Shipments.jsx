@@ -225,8 +225,8 @@ const Shipments = () => {
                 <tr key={shipment._id} className="border-b hover:bg-gray-50">
                   <td className="p-3 text-sm font-medium text-primary">{shipment.shipmentId}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.customer?.name || 'N/A'}</td>
-                  <td className="p-3 text-sm text-gray-500">{shipment.agent?.name || 'Unassigned'}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.origin}</td>
+                  <td className="p-3 text-sm text-gray-500">{shipment.agent?.name || 'Unassigned'}</td>
                   <td className="p-3 text-sm text-gray-700">{shipment.destination}</td>
                   <td className="p-3 text-sm"><StatusBadge status={shipment.status} /></td>
                   <td className="p-3 text-sm text-gray-500">{format(new Date(shipment.dispatchDate), 'MMM dd, yyyy')}</td>
