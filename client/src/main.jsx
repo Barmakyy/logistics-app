@@ -17,6 +17,9 @@ import Payments from './pages/Payments.jsx';
 import Settings from './pages/Settings.jsx';
 import Messages from './pages/Messages.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
+import CustomerDashboardOverview from './pages/CustomerDashboardOverview.jsx';
+import ShipmentTracker from './pages/ShipmentTracker.jsx';
+import CustomerShipments from './pages/CustomerShipments.jsx';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
@@ -45,7 +48,15 @@ const router = createBrowserRouter([
           { path: 'messages', element: <Messages /> },
         ],
       },
-      { path: 'customer/dashboard', element: <CustomerDashboard /> },
+      {
+        path: 'customer/dashboard',
+        element: <CustomerDashboard />,
+        children: [
+          { index: true, element: <CustomerDashboardOverview /> },
+          { path: 'shipments', element: <CustomerShipments /> },
+          { path: 'shipments/:id/track', element: <ShipmentTracker /> },
+        ],
+      },
     ],
   },
 ]);

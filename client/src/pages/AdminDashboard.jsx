@@ -120,6 +120,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen, user }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const notificationRef = useRef(null);
   const { user: authUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -130,16 +133,45 @@ const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen, user }) => {
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(false);
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('/notifications');
+        setNotifications(res.data.data.notifications);
+      } catch (error) {
+        console.error('Failed to fetch notifications');
       }
     };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setDropdownOpen(false);
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) setNotificationOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
+      clearInterval(interval);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [dropdownRef]);
+
+  const handleNotificationClick = async (notification) => {
+    try {
+      // Navigate first for a faster user experience
+      navigate(notification.link);
+      setNotificationOpen(false);
+
+      // Then mark as read
+      await api.patch(`/notifications/${notification._id}/read`);
+
+      // Update state to remove the notification from the list
+      setNotifications(prev => prev.filter(n => n._id !== notification._id));
+    } catch (error) {
+      console.error('Failed to mark notification as read', error);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm p-4 flex justify-between items-center">
@@ -163,9 +195,35 @@ const TopNavbar = ({ isSidebarOpen, setIsSidebarOpen, user }) => {
 
       {/* Right-side icons and profile */}
       <div className="flex items-center space-x-6">
-        <button className="text-gray-500 hover:text-primary">
-          <FaBell size={22} />
-        </button>
+        <div className="relative" ref={notificationRef}>
+          <button onClick={() => setNotificationOpen(!notificationOpen)} className="text-gray-500 hover:text-primary relative">
+            <FaBell size={22} />
+            {notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+          <AnimatePresence>
+            {notificationOpen && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-xl z-20">
+                <div className="p-3 font-bold border-b">Notifications</div>
+                <div className="py-1 max-h-80 overflow-y-auto">
+                  {notifications.length > 0 ? (
+                    notifications.map(notif => (
+                      <div key={notif._id} onClick={() => handleNotificationClick(notif)} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                        <p>{notif.text}</p>
+                        <p className="text-xs text-gray-400 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="px-4 py-3 text-sm text-gray-500">No new notifications.</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <div className="relative" ref={dropdownRef}>
           <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2">
             {user?.profilePicture ? (

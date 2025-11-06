@@ -11,6 +11,8 @@ import agentRouter from './routes/agentRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import settingRouter from './routes/settingRoutes.js';
 import uploadRouter from './routes/uploadRoutes.js';
+import customerDashboardRouter from './routes/customerDashboardRoutes.js';
+import notificationRouter from './routes/notificationRoutes.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -34,6 +36,8 @@ app.use('/api/payments', paymentRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/settings', settingRouter);
 app.use('/api/uploads', uploadRouter);
+app.use('/api/customer-dashboard', customerDashboardRouter);
+app.use('/api/notifications', notificationRouter);
 
 // A simple test route
 app.get('/api/test', (req, res) => {
