@@ -151,6 +151,32 @@ export const generateInvoice = async (req, res) => {
   }
 };
 
+// @desc    Update a payment (e.g., change status to Completed)
+// @route   PATCH /api/payments/:id
+// @access  Private/Admin
+export const updatePayment = async (req, res) => {
+  try {
+    const { status, method, transactionId } = req.body;
+
+    const updatedPayment = await Payment.findByIdAndUpdate(
+      req.params.id,
+      {
+        status,
+        method: method || 'M-Pesa', // Allow admin to set method if completing
+        transactionId,
+        transactionDate: status === 'Completed' ? new Date() : undefined, // Update date if completed
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedPayment) return res.status(404).json({ status: 'fail', message: 'Payment not found.' });
+
+    res.status(200).json({ status: 'success', data: { payment: updatedPayment } });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
+  }
+};
+
 // @desc    Create a new payment
 // @route   POST /api/payments
 // @access  Private/Admin

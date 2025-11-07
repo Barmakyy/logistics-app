@@ -255,8 +255,8 @@ const Payments = () => {
                   <td className="p-3 text-sm"><StatusBadge status={payment.status} /></td>
                   <td className="p-3 text-sm">
                     <div className="flex space-x-3">
-                      <button onClick={() => openModal(payment)} className="text-blue-500 hover:text-blue-700">View</button>
-                      {payment.status === 'Pending' && <button className="text-green-500 hover:text-green-700">Approve</button>}
+                      <button onClick={() => openModal(payment)} className="text-blue-500 hover:text-blue-700 font-semibold">View</button>
+                      {payment.status === 'Pending' && <button onClick={() => handleApprovePayment(payment._id)} className="text-green-500 hover:text-green-700 font-semibold">Approve</button>}
                       {payment.status === 'Failed' && <button className="text-yellow-500 hover:text-yellow-700">Retry</button>}
                     </div>
                   </td>
