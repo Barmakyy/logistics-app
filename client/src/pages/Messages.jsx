@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaEnvelope, FaEnvelopeOpen, FaReply, FaTrash, FaSearch, FaPaperPlane, FaFilter } from 'react-icons/fa';
+import { FaEnvelope, FaEnvelopeOpen, FaReply, FaTrash, FaSearch, FaPaperPlane, FaFilter, FaSpinner } from 'react-icons/fa';
 import { format, formatDistanceToNow } from 'date-fns';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import api from '../api/axios';
@@ -38,6 +38,7 @@ const Messages = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
   const { showNotification } = useNotification();
 
   const fetchData = async () => {
@@ -111,15 +112,20 @@ const Messages = () => {
       showNotification('Reply cannot be empty.', 'error');
       return;
     }
+    setIsReplying(true);
     try {
-      await api.post(`/messages/${selectedMessage._id}/reply`, { replyBody: replyText });
+      const res = await api.post(`/messages/${selectedMessage._id}/reply`, { replyBody: replyText });
       showNotification('Reply sent successfully!', 'success');
       setReplyText(''); // Clear the textarea
       // Refetch data to update the message status in the list
       fetchData();
+      // Also update the selected message to show the reply instantly
+      setSelectedMessage(res.data.data.message);
     } catch (err) {
       showNotification('Failed to send reply.', 'error');
       console.error(err);
+    } finally {
+      setIsReplying(false);
     }
   };
 
@@ -225,22 +231,34 @@ const Messages = () => {
                 {selectedMessage.body}
               </p>
 
+              {/* Show existing reply */}
+              {selectedMessage.reply && (
+                <div className="bg-gray-100 p-4 rounded-lg mt-6">
+                  <p className="font-bold text-primary mb-2">Your Reply:</p>
+                  <p className="text-gray-600 whitespace-pre-wrap">{selectedMessage.reply}</p>
+                </div>
+              )}
               {/* Quick Reply Form */}
               <div>
-                <h3 className="text-lg font-semibold text-primary mb-3">Quick Reply</h3>
+                <h3 className="text-lg font-semibold text-primary mb-3 mt-8 border-t pt-6">Quick Reply</h3>
                 <textarea
                   placeholder="Write a reply..."
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   rows="4"
-                  className="w-full border rounded-lg px-4 py-3 mb-4 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 mb-4 focus:ring-2 focus:ring-yellow-400 outline-none transition"
                 ></textarea>
                 <div className="flex justify-end gap-3">
                   <button onClick={() => updateMessageStatus(selectedMessage._id, 'Spam')} className="bg-gray-200 text-gray-800 px-5 py-2 rounded-lg font-semibold hover:bg-gray-300 transition">
                     Mark as Spam
                   </button>
-                  <button onClick={handleReplySubmit} className="bg-accent text-primary px-5 py-2 rounded-lg font-bold hover:bg-yellow-400 transition flex items-center">
-                    <FaPaperPlane className="mr-2" /> Send Reply
+                  <button
+                    onClick={handleReplySubmit}
+                    disabled={isReplying}
+                    className="bg-accent text-primary px-5 py-2 rounded-lg font-bold hover:bg-yellow-400 transition flex items-center disabled:bg-yellow-300"
+                  >
+                    {isReplying ? <FaSpinner className="animate-spin mr-2" /> : <FaPaperPlane className="mr-2" />}
+                    Send Reply
                   </button>
                   <button onClick={() => handleDeleteMessage(selectedMessage._id)} className="bg-red-500 text-white px-5 py-2 rounded-lg font-bold hover:bg-red-600 transition flex items-center">
                     <FaTrash className="mr-2" /> Delete

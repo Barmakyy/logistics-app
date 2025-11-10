@@ -175,13 +175,14 @@ export const replyToMessage = async (req, res) => {
 
       // Update the message status to 'Replied' only after the email is sent
       message.status = 'Replied';
+      message.reply = replyBody; // Save the reply text to the message
       await message.save();
     } catch (emailError) {
       console.error('EMAIL SENDING ERROR: ', emailError);
       return res.status(500).json({ status: 'error', message: 'Failed to send email reply. Please try again later.' });
     }
 
-    res.status(200).json({ status: 'success', message: 'Reply sent successfully.' });
+    res.status(200).json({ status: 'success', message: 'Reply sent successfully.', data: { message } });
   } catch (error) {
     res.status(400).json({ status: 'fail', message: error.message });
   }

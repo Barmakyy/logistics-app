@@ -116,6 +116,35 @@ const Payments = () => {
     }
   };
 
+  const handleApprovePayment = async (paymentId) => {
+    try {
+      await api.patch(`/payments/${paymentId}`, { status: 'Completed' });
+      showNotification('Payment approved successfully!', 'success');
+      // Refetch data to update the UI
+      if (currentPage !== 1) setCurrentPage(1);
+      else fetchData();
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to approve payment.';
+      showNotification(message, 'error');
+      console.error(err);
+    }
+  };
+
+  const handleRetryPayment = async (paymentId) => {
+    try {
+      // Set the status back to 'Pending' to allow for another payment attempt
+      await api.patch(`/payments/${paymentId}`, { status: 'Pending' });
+      showNotification('Payment status reset to Pending.', 'success');
+      // Refetch data to update the UI
+      if (currentPage !== 1) setCurrentPage(1);
+      else fetchData();
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to retry payment.';
+      showNotification(message, 'error');
+      console.error(err);
+    }
+  };
+
   const handleDownloadInvoice = (paymentId) => {
     api.get(`/payments/${paymentId}/invoice`, { responseType: 'blob' })
       .then(response => {
@@ -257,7 +286,7 @@ const Payments = () => {
                     <div className="flex space-x-3">
                       <button onClick={() => openModal(payment)} className="text-blue-500 hover:text-blue-700 font-semibold">View</button>
                       {payment.status === 'Pending' && <button onClick={() => handleApprovePayment(payment._id)} className="text-green-500 hover:text-green-700 font-semibold">Approve</button>}
-                      {payment.status === 'Failed' && <button className="text-yellow-500 hover:text-yellow-700">Retry</button>}
+                      {payment.status === 'Failed' && <button onClick={() => handleRetryPayment(payment._id)} className="text-yellow-500 hover:text-yellow-700 font-semibold">Retry</button>}
                     </div>
                   </td>
                 </tr>

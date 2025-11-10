@@ -18,6 +18,8 @@ import Settings from './pages/Settings.jsx';
 import Messages from './pages/Messages.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import CustomerDashboardOverview from './pages/CustomerDashboardOverview.jsx';
+import CustomerMessages from './pages/CustomerMessages.jsx';
+import CustomerSettings from './pages/CustomerSettings.jsx';
 import CustomerPayments from './pages/CustomerPayments.jsx';
 import ShipmentTracker from './pages/ShipmentTracker.jsx';
 import CustomerShipments from './pages/CustomerShipments.jsx';
@@ -55,7 +57,9 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <CustomerDashboardOverview /> },
           { path: 'shipments', element: <CustomerShipments /> },
+          { path: 'messages', element: <CustomerMessages /> },
           { path: 'payments', element: <CustomerPayments /> },
+          { path: 'settings', element: <CustomerSettings /> },
           { path: 'shipments/:id/track', element: <ShipmentTracker /> },
         ],
       },

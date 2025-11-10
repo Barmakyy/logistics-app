@@ -24,6 +24,11 @@ const messageSchema = new mongoose.Schema(
       enum: ['Unread', 'Replied', 'Spam', 'Archived'],
       default: 'Unread',
     },
+    reply: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     // Optionally link to a User if the sender is a registered customer
     user: {
       type: mongoose.Schema.Types.ObjectId,

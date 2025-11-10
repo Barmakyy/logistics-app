@@ -68,7 +68,7 @@ export const updatePassword = async (req, res) => {
   const user = await User.findById(req.user.id).select('+password');
 
   // 2) Check if POSTed current password is correct
-  if (!(await user.correctPassword(req.body.currentPassword, user.password))) {
+  if (!user || !(await bcrypt.compare(req.body.currentPassword, user.password))) {
     return res.status(401).json({ status: 'fail', message: 'Your current password is wrong.' });
   }
 
@@ -136,8 +136,12 @@ export const updateMe = async (req, res) => {
     }
 
     // 2) Filtered out unwanted fields names that are not allowed to be updated
-    const { name, email, phone, profilePicture } = req.body;
-    const filteredBody = { name, email, phone, profilePicture };
+    const filteredBody = {};
+    if (req.body.name) filteredBody.name = req.body.name;
+    if (req.body.email) filteredBody.email = req.body.email;
+    // Allow updating the phone number, even to an empty string
+    if (req.body.phone !== undefined) filteredBody.phone = req.body.phone;
+    if (req.body.profilePicture) filteredBody.profilePicture = req.body.profilePicture;
 
     // 3) Update user document
     const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, { new: true, runValidators: true });

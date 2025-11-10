@@ -2,6 +2,7 @@ import Shipment from '../models/Shipment.js';
 import mongoose from 'mongoose'; // Import mongoose for Types.ObjectId
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
+import Message from '../models/Message.js';
 import Notification from '../models/Notification.js';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
@@ -317,5 +318,62 @@ export const processCustomerPayment = async (req, res) => {
     res.status(200).json({ status: 'success', data: { payment } });
   } catch (error) {
     res.status(500).json({ status: 'error', message: 'Failed to process payment.', error: error.message });
+  }
+};
+
+// @desc    Get all messages for the logged-in customer
+// @route   GET /api/customer-dashboard/messages
+// @access  Private/Customer
+export const getCustomerMessages = async (req, res) => {
+  try {
+    const customerId = req.user.id;
+    const messages = await Message.find({ user: customerId }).sort({ createdAt: -1 });
+    res.status(200).json({
+      status: 'success',
+      data: {
+        messages,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Failed to fetch messages.', error: error.message });
+  }
+};
+
+// @desc    Create a new message from a customer
+// @route   POST /api/customer-dashboard/messages
+// @access  Private/Customer
+export const createCustomerMessage = async (req, res) => {
+  try {
+    const { subject, body } = req.body;
+    const newMessage = await Message.create({
+      sender: req.user.name,
+      email: req.user.email,
+      user: req.user.id, // Use 'user' to match the Message model schema
+      subject,
+      body,
+      status: 'Unread', // New messages from customers are 'Unread' for admins
+    });
+    res.status(201).json({ status: 'success', data: { message: newMessage } });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
+  }
+};
+
+// @desc    Delete a message for the logged-in customer
+// @route   DELETE /api/customer-dashboard/messages/:id
+// @access  Private/Customer
+export const deleteCustomerMessage = async (req, res) => {
+  try {
+    const message = await Message.findOne({ _id: req.params.id, user: req.user.id });
+
+    if (!message) {
+      return res.status(404).json({ status: 'fail', message: 'Message not found or you do not have permission to delete it.' });
+    }
+
+    await Message.findByIdAndDelete(req.params.id);
+
+    res.status(204).json({ status: 'success', data: null });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
   }
 };
